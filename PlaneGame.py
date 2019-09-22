@@ -11,11 +11,12 @@ import pygame
 import numpy as np
 
 EPISODES = 2000
+GAME = 'flight'
 
 
 class PlaneGame(object):
     """
-    飞机大战主类 main class
+    Game main class
     """
     def __init__(self):
         # 创建游戏窗口
@@ -36,7 +37,7 @@ class PlaneGame(object):
 
         # 调用私有方法，创建精灵和精灵组
         # Create sprites and sprite groups by private method
-        self.__create_sprites()
+        self._create_sprites()
 
         # 设置定时器事件 - 创建敌机 2s，英雄发射子弹1.5ms, 敌机发射子弹3s
         # Set three events to appear on the event queue:
@@ -47,7 +48,32 @@ class PlaneGame(object):
         pygame.time.set_timer(HERO_FIRE_EVENT, 1500)
         pygame.time.set_timer(ENEMY_FIRE_EVENT, 3000)
 
-    def __create_sprites(self):
+    def _start_game(self):
+        # 为了让窗口长时间显示，需要放到循环里
+        # To display the windows constantly, we need to update the windows in a loop
+        while True:
+            
+            self._event_handler()
+
+            self._control()
+
+            # 碰撞检测
+            # Detect collision
+            self._check_collide()
+
+            # 更新/绘制精灵组
+            # Update sprites on the display
+            self._update_sprite()
+
+            # 实时显示得分
+            # Show the score instantly
+            self.score_surface = self.score_font.render(u'score = %d' % self.score, True, (0, 0, 0))
+            self.screen.blit(self.score_surface, (5, 5))
+
+            # 更新显示
+            pygame.display.update()
+
+    def _create_sprites(self):
 
         # 创建游戏背景
         # Create background sprite
@@ -59,15 +85,40 @@ class PlaneGame(object):
         # Create enemy sprite group
         self.enemy_group = pygame.sprite.Group()
 
+    def _event_handler(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self._game_over(self)
+
+            elif event.type == CREATE_ENEMY_EVENT:
+                # 敌机出场
+                # Create one enemy
+                enemy = Enemy()
+                # This enemy fires
+                enemy.fire()
+                # Add this enemy to the enemy sprite group
+                self.enemy_group.add(enemy)
+
+            elif event.type == HERO_FIRE_EVENT:
+                self.hero.fire()
+
+            elif event.type == ENEMY_FIRE_EVENT:
+                for one_enemy in self.enemy_group:
+                    one_enemy.fire()
+
+    def _control(self):
+        pass
+
+
     def _check_collide(self):
         # 1.英雄子弹摧毁敌机
-        # Hero's bullets destroy enemies
+        # 1. Hero's bullets destroy enemies
         enemies = pygame.sprite.groupcollide(self.hero.bullet_group, self.enemy_group, True, True)
         for enemy in enemies:
             self.score += 1
 
         # 2.敌机或者子弹撞毁英雄
-        # Hero is killed by enemies or enemies'bullets
+        # 2. Hero is killed by enemies or enemies'bullets
         enemies_killers = pygame.sprite.spritecollide(self.hero, self.enemy_group, True)
         bullets = 0
         for one_enemy in self.enemy_group:
@@ -76,9 +127,9 @@ class PlaneGame(object):
         # 判断列表有无内容
         # If there exist enemy or bullet which collide with Hero, the game is over
         if len(enemies_killers) > 0 or bullets > 0:
-            # 销毁英雄
+            # Destroy hero
             self.hero.kill()
-            # 结束游戏
+            # Game over
             PlaneGame._game_over(self)
 
     def _update_sprite(self):
@@ -115,50 +166,9 @@ class PlayerGame(PlaneGame):
         self.hero_group = pygame.sprite.Group(self.hero)
 
     def start_game(self):
-        # 为了让窗口长时间显示，需要放到循环里
-        # To display the windows constantly, we need to update the windows in a loop
-        while True:
-            # 检测真人操作
-            # Detect the player's manipulation
-            self._event_handler()
-
-            # 碰撞检测
-            # Detect collision
-            super()._check_collide()
-
-            # 更新/绘制精灵组
-            # Update sprites on the display
-            super()._update_sprite()
-
-            # 实时显示得分
-            # Show the score instantly
-            self.score_surface = self.score_font.render(u'score = %d' % self.score, True, (0, 0, 0))
-            self.screen.blit(self.score_surface, (5, 5))
-
-            # 更新显示
-            pygame.display.update()
-
-    def _event_handler(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                super()._game_over(self)
-
-            elif event.type == CREATE_ENEMY_EVENT:
-                # 敌机出场
-                # Create one enemy
-                enemy = Enemy()
-                # This enemy fires
-                enemy.fire()
-                # Add this enemy to the enemy sprite group
-                self.enemy_group.add(enemy)
-
-            elif event.type == HERO_FIRE_EVENT:
-                self.hero.fire()
-
-            elif event.type == ENEMY_FIRE_EVENT:
-                for one_enemy in self.enemy_group:
-                    one_enemy.fire()
-
+        super()._start_game()
+        
+    def _control(self):
         # 使用键盘提供的方法获取键盘按键 - 按键元组
         # Get the press tuple from the keyboard
         pressed_key = pygame.key.get_pressed()
@@ -181,7 +191,7 @@ class PlayerGame(PlaneGame):
 
 
 # Rule-based AI
-# Reference on flock algorithm
+# Adapted from flock algorithm
 class FlockGame(PlaneGame):
 
     def __init__(self):
@@ -192,44 +202,9 @@ class FlockGame(PlaneGame):
         self.hero_group = pygame.sprite.Group(self.hero)
 
     def start_game(self):
-        while True:
-            pygame.display.update()
-            # AI control Hero
-            self.control_flight()
+        super()._start_game()
 
-            # 碰撞检测
-            super()._check_collide()
-
-            # 更新/绘制精灵组
-            super()._update_sprite()
-
-            # 显示得分
-            self.score_surface = self.score_font.render(u'score = %d' % self.score, True, (0, 0, 0))
-            self.screen.blit(self.score_surface, (5, 5))
-
-            # 更新显示
-            pygame.display.update()
-
-    def control_flight(self):
-        # 根据事件队列创建精灵
-        # Create sprites according to events queue
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                super()._game_over(self)
-            elif event.type == CREATE_ENEMY_EVENT:
-                # 敌机出场
-                # Create enemy
-                enemy = Enemy()
-                enemy.fire()
-                self.enemy_group.add(enemy)
-
-            elif event.type == HERO_FIRE_EVENT:
-                self.hero.fire()
-
-            elif event.type == ENEMY_FIRE_EVENT:
-                for one_enemy in self.enemy_group:
-                    one_enemy.fire()
-
+    def _control(self):
         # 获得所有敌机产生的所有子弹
         # Get all the bullets produced by all the enemies
         all_bullets = pygame.sprite.Group()
@@ -253,22 +228,32 @@ class DRLGame(PlaneGame):
         # AI agent has 4 states and 5 corresponding actions
         self.state_size = 4
         self.action_size = 5
+
         self.hero = DRLHero()
         self.hero_group = pygame.sprite.Group(self.hero)
+
         self.STATE_1 = numpy.array([1, 0, 0, 0]) # 上方有敌机 没有在危险区内的子弹 There exist enemies above Hero, but no dangerous bullets
         self.STATE_2 = numpy.array([0, 1, 0, 0]) # 上方有敌机，有在危险区内的子弹  There exist enemies above Hero, also dangerous bullets
         self.STATE_3 = numpy.array([0, 0, 1, 0]) # 上方无敌机，没有子弹 There exist no enemies above Hero, as well as no bullets
         self.STATE_4 = numpy.array([0, 0, 0, 1]) # 上方无子弹，但是敌机会击中英雄 There exist enemies that can collide with Hero
 
         # Training parameters
-        self.done = False
+
+        self.OBSERVE = 100000. # timesteps to observe before training
+        self.EXPLORE = 2000000. # frames over which to anneal epsilon
+        self.FINAL_EPSILON = 0.0001 # final value of epsilon
+        self.INITIAL_EPSILON = 0.0001 # starting value of epsilon
+        self.FRAME_PER_ACTION = 1
+
+        self.terminal = False
         self.batch_size = 32
-        self.memory = deque(maxlen=500)
-        self.gamma = 0.95  # discount rate
+        self.memory = deque(maxlen=500)  # number of previous transitions to remember
+        self.gamma = 0.99  # decay rate of past observations
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.99
         self.learning_rate = 0.001
+
         self.model = self._build_model()
         self.target_model = self._build_model()
         self.update_target_model()
@@ -276,24 +261,27 @@ class DRLGame(PlaneGame):
         self.current_epsilon = open('./epsilon.txt', 'w+')
 
     def start_game(self):
-        self.event_handler()
+
+        super().event_handler()
+
         all_bullets = pygame.sprite.Group()
         for enemy in self.enemy_group:
             all_bullets.add(enemy.enemy_bullet_group)
 
-        # 下载训练好的模型的参数
-        # Load the trained parameters
-        # self.load("./save/flight-war-dqn.h5")
-
         # Get initial game state
         game_state = self.get_game_state(self.enemy_group, all_bullets)
         game_state = np.reshape(game_state, [1, self.state_size])
+
         # 训练模型
         # Training the model by Q learning
         self.q_learning(game_state)
 
         # 模型训练好，用下面的代码
         # After getting the trained parameters, remove the comments
+        # 下载训练好的模型的参数
+        # Load the trained parameters
+        # self.load("./save/flight-war-dqn.h5")
+
         # while True:
         #     # 产生敌机、发射子弹
         #     self.event_handler()
@@ -319,23 +307,6 @@ class DRLGame(PlaneGame):
         #     # 更新显示
         #     pygame.display.update()
 
-    def event_handler(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                super()._game_over(self)
-            elif event.type == CREATE_ENEMY_EVENT:
-                # 敌机出场
-                enemy = Enemy()
-                enemy.fire()
-                self.enemy_group.add(enemy)
-
-            elif event.type == HERO_FIRE_EVENT:
-                self.hero.fire()
-
-            elif event.type == ENEMY_FIRE_EVENT:
-                for one_enemy in self.enemy_group:
-                    one_enemy.fire()
-
     def get_game_state(self, enemies, bullets):
         enemy_above = self.hero.enemy_above(enemies)
         bullet_above = self.hero.bullet_above(enemies, bullets)
@@ -357,10 +328,31 @@ class DRLGame(PlaneGame):
             return numpy.array([0, 0, 0, 1])
 
     def q_learning(self, state):
+        # store the previous observations in replay memory
+        
+        # printing
+        a_file = open("logs_" + GAME + "/readout.txt", 'w')
+        h_file = open("logs_" + GAME + "/hidden.txt", 'w')
+
+        # get the first state by doing nothing
+        do_nothing = 0
+        s_t, r_0, terminal = self.step(do_nothing)
+
+        # saving and loading networks
+
+
+
+
+
+
+        # start training
+        epsilon = self.INITIAL_EPSILON
+        t = 0
+
         for e in range(EPISODES):
             for time in range(200):
                 action = self.act(state)
-                next_state, reward, done, _ = self.step(action)
+                next_state, reward, terminal, _ = self.step(action)
                 # reward = reward if not done else -10
                 next_state = np.reshape(next_state, [1, self.state_size])
                 self.remember(state, action, reward, next_state, done)
@@ -376,24 +368,11 @@ class DRLGame(PlaneGame):
             # self.save("./save/flight-war-dqn.h5")
 
     def _check_collide(self):
-        # 即将与英雄碰撞的敌机
-        # Get enemies which will collide with Hero
-        enemies_killers = pygame.sprite.spritecollide(self.hero, self.enemy_group, True)
 
-        bullets = 0
-        for one_enemy in self.enemy_group:
-            bullets += len(pygame.sprite.spritecollide(self.hero, one_enemy.enemy_bullet_group, False))
-
-        if len(enemies_killers) > 0 or bullets > 0:
-            # 销毁英雄
-            # Hero will be killed
-            return True
-        else:
-            # Hero is still alive
-            return False
 
     def step(self, action):
         pygame.display.update()
+
         self.hero.my_update(action)
 
         # ------------------实时演示学习过程----------------------------------------
@@ -430,13 +409,13 @@ class DRLGame(PlaneGame):
         next_state = self.get_game_state(self.enemy_group, all_bullets)
 
         # 英雄是否被摧毁
-        # If Hero is killed, done is TRUE; otherwise done is FALSE
-        done = self._check_collide()
+        # If Hero is killed, terminal is TRUE; otherwise terminal is FALSE
+        terminal = self._check_collide()
         reward = 0.
 
         # 英雄没有阵亡
         # Hero is still alive
-        if not done:
+        if not terminal:
             reward += 1.0
 
         # 英雄上方有敌机，并且没有在危险区域内的子弹
@@ -459,10 +438,10 @@ class DRLGame(PlaneGame):
 
         # 英雄阵亡
         # Hero is dead
-        elif done:
+        elif terminal:
             reward += -30.0
 
-        return next_state, reward, done, {}
+        return next_state, reward, terminal, {}
 
     def _huber_loss(self, target, prediction):
         # sqrt(1+error^2)-1
