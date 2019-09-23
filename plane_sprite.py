@@ -368,16 +368,17 @@ class DRLHero(Hero):
         self.dangerous_dist = self.rect.height * 5
 
     def my_update(self, action):
-        if action == 1: # move down
-            self.rect.centery -= self.speed
-        elif action == 2:  # move up
-            self.rect.centery += self.speed
-        elif action == 3:  # move left
-            self.rect.centerx -= self.speed
-        elif action == 4:  # move right
-            self.rect.centerx += self.speed
-        else:  # 不动 no move 
+        if action[0] == 1:
             pass
+        elif action[1] == 1: # move down
+            self.rect.centery -= self.speed
+        elif action[2] == 1:  # move up
+            self.rect.centery += self.speed
+        elif action[3] == 1:  # move left
+            self.rect.centerx -= self.speed
+        elif action[4] == 1:  # move right
+            self.rect.centerx += self.speed
+        
 
         # 控制英雄不能离开屏幕
         # Hero cannot move outside the screen
