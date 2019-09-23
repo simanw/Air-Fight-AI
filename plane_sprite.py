@@ -364,7 +364,7 @@ class DRLHero(Hero):
     def __init__(self):
         super().__init__()
         # Set Hero's speed and dangerous distance
-        self.speed = 10
+        self.speed = 5
         self.dangerous_dist = self.rect.height * 5
 
     def my_update(self, action):
@@ -396,14 +396,14 @@ class DRLHero(Hero):
         # 子弹是否会打到英雄
 
         for bullet in bullets:
-            if (self.rect.top - bullet.rect.bottom) < self.dangerous_dist and (bullet.rect.left <= self.rect.right or bullet.rect.right >= self.rect.left):
+            if (self.rect.top - bullet.rect.bottom) <= self.dangerous_dist and (bullet.rect.left <= self.rect.right or bullet.rect.right >= self.rect.left):
                 return True
 
         # 敌机是否会打到英雄
-        # Judje whether there exists a enemy above Hero going to collide with Hero,
+        # Judge whether there exists a enemy above Hero going to collide with Hero,
         # in this case, the enemy can be seen as a bullet
         for enemy in enemies:
-            if (self.rect.top - enemy.rect.bottom) < self.dangerous_dist and (enemy.rect.left <= self.rect.right or enemy.rect.right >= self.rect.left):
+            if (self.rect.top - enemy.rect.bottom) <= self.dangerous_dist and (enemy.rect.left <= self.rect.right or enemy.rect.right >= self.rect.left):
                 return True
 
         return False

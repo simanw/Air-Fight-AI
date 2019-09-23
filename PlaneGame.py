@@ -10,10 +10,7 @@ from keras import backend as K
 import pygame
 import numpy as np
 
-EPISODES = 2000
 FRAME_PER_ACTION = 1
-
-GAME = 'flight'
 
 
 class PlaneGame(object):
@@ -24,7 +21,7 @@ class PlaneGame(object):
         # 创建游戏窗口
         # Create game windows
         self.screen = pygame.display.set_mode(SCREEN_RECT.size, HWSURFACE | DOUBLEBUF)
-        pygame.display.set_caption("Air Fight with two type of AI")
+        pygame.display.set_caption("Air Fight with two types of AI")
 
         # 设置时钟及其刷新频率
         # Set clock and its refresh frequency
@@ -223,9 +220,9 @@ class DRLGame(PlaneGame):
         super().__init__()
         # 计算量太大，将事件频率降低，画面会好一点
         # As model-training is time-consuming, it would better to decrease the event frequency
-        pygame.time.set_timer(CREATE_ENEMY_EVENT, 5000)
-        pygame.time.set_timer(HERO_FIRE_EVENT, 2000)
-        pygame.time.set_timer(ENEMY_FIRE_EVENT, 5000)
+        pygame.time.set_timer(CREATE_ENEMY_EVENT, 2000)
+        pygame.time.set_timer(HERO_FIRE_EVENT, 1000)
+        pygame.time.set_timer(ENEMY_FIRE_EVENT, 3000)
 
         # AI agent has 4 states and 5 corresponding actions
         self.state_size = 4
@@ -242,30 +239,48 @@ class DRLGame(PlaneGame):
         # Training parameters
 
         self.OBSERVE = 3200 # timesteps to observe before training
-        self.EXPLORE = 2000000 # frames over which to anneal epsilon
+        self.EXPLORE = 300000 # frames over which to anneal epsilon
         self.FINAL_EPSILON = 0.0001 # final value of epsilon
         self.INITIAL_EPSILON = 0.1 # starting value of epsilon
         self.FRAME_PER_ACTION = 1
-        self.REPLAY_MEMORY = 500
-
+        self.REPLAY_MEMORY = 50000
+        self.EPISODES = 500000
         self.batch_size = 32
         self.gamma = 0.99  # decay rate of past observations
-        self.learning_rate = 0.0001
+        self.learning_rate = 0.001
 
         
     def start_game(self):
 
-        super()._event_handler()
-        self.model = self.build_model()
-        # 训练模型
-        # Training the model by Q learning
-        self.train_network()
 
+        # super()._event_handler()
+        # self.model = self.build_model()
+        # # 训练模型
+        # # Training the model by Q learning
+        # self.train_network()
+
+        #-----------------------------------------------------------------------
         # 模型训练好，用下面的代码
         # After getting the trained parameters, remove the comments
         # 下载训练好的模型的参数
         # Load the trained parameters
-        # self.load("./save/model.h5")
+        self.model = self.build_model()
+        self.model.load_weights("model.h5")
+        super()._start_game()
+
+
+    def _control(self):
+        # get the first state
+        s_t = numpy.array([0, 0, 1, 0])
+
+        # In keras, need to reshape
+        s_t = np.reshape(s_t, [1, self.state_size])
+        a_t = np.zeros([self.action_size])
+
+        q = self.model.predict(s_t)
+        max_Q = np.argmax(q)
+        a_t[max_Q] = 1
+        self.hero.my_update(a_t)
 
 
     def build_model(self):
@@ -273,7 +288,7 @@ class DRLGame(PlaneGame):
         model = Sequential()
         model.add(Dense(24, input_dim=self.state_size, activation='relu'))
         model.add(Dense(24, activation='relu'))
-        model.add(Dense(self.action_size, activation='linear'))
+        model.add(Dense(self.action_size, activation='relu'))
         model.compile(loss='mse',
                       optimizer=Adam(lr=self.learning_rate))
 
@@ -293,7 +308,7 @@ class DRLGame(PlaneGame):
         epsilon = self.INITIAL_EPSILON
         t = 0
 
-        while True:
+        for i in range(self.EPISODES):
             loss = 0
             Q_sa = 0
             action_index = 0
@@ -382,8 +397,6 @@ class DRLGame(PlaneGame):
 
         # 更新
         pygame.display.update()
-        # -----------------------------------------------------------------------
-        # -----------------------------------------------------------------------
 
         all_bullets = pygame.sprite.Group()
         for enemy in self.enemy_group:
@@ -398,11 +411,9 @@ class DRLGame(PlaneGame):
         terminal = self.is_terminal()
         reward = 0
 
-        # 英雄没有阵亡
-        # Hero is still alive
-        if not terminal:
-            reward += 1
-
+        # Hero kills enemies
+        if self.is_kill():
+            reward += 10
         # 英雄上方有敌机，并且没有在危险区域内的子弹
         if (next_state==self.STATE_1).all():
             reward += 5
@@ -413,7 +424,7 @@ class DRLGame(PlaneGame):
 
         # 英雄上方无敌机，并且没有在危险区域内的子弹
         elif (next_state==self.STATE_3).all():
-            reward += 1
+            reward += 0
 
         # 英雄上方没有子弹，但是因为敌机的size比子弹小，存在敌机会击毁英雄的可能
         # Though there is no bullet above Hero, the enemy probably kills Hero because its smaller size than bullets
@@ -434,19 +445,19 @@ class DRLGame(PlaneGame):
         # 状态1：英雄上方有敌机无子弹
         # STATE_1
         if enemy_above == True and bullet_above == False:
-            return numpy.array([1, 0, 0, 0])
+            return self.STATE_1
         # 状态2：有敌机有子弹
         # STATE_2
         elif enemy_above == True and bullet_above == True:
-            return numpy.array([0, 1, 0, 0])
+            return self.STATE_2
         # 状态3：无敌机无子弹
         # STATE_3
         elif enemy_above == False and bullet_above == False:
-            return numpy.array([0, 0, 1, 0])
+            return self.STATE_3
         # 状态4： 没有英雄正对的敌机，但是该敌机会击毁英雄，因此可以看做是子弹
         # STATE_4
         elif enemy_above == False and bullet_above == True:
-            return numpy.array([0, 0, 0, 1])
+            return self.STATE_4
 
     def is_terminal(self):
         # 敌机或者子弹撞毁英雄
@@ -460,5 +471,9 @@ class DRLGame(PlaneGame):
         # If there exist enemy or bullet which collide with Hero, the game is over
         return True if len(enemies_killers) > 0 or bullets > 0 else False
 
+    def is_kill(self):
+        # Hero's bullets destroy enemies
+        enemies = pygame.sprite.groupcollide(self.hero.bullet_group, self.enemy_group, True, True)
+        return True if len(enemies) > 0 else False
 
 
